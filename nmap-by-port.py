@@ -15,7 +15,8 @@ def do_parse(the_file, tcp=None, udp=None, requested_ports=None,
              filter_expression=None):
     r = etree.ElementTree(file=the_file)
     ports = defaultdict(list)
-    all_ports = r.xpath('//*/port')
+    # search for open ports; get the parent of the ports with 'state'='open'
+    all_ports = r.xpath('//*/port/state[@state="open"]/..')
     for port in all_ports:
         if filter_expression is not None:
             try:
