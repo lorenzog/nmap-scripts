@@ -8,13 +8,18 @@ author: https://github.com/lorenzog
 from __future__ import print_function
 import argparse
 from collections import defaultdict
+import sys
 from lxml import etree
 
 
 def do_parse(the_file, tcp=None, udp=None, requested_ports=None,
              filter_expression=None):
-    r = etree.ElementTree(file=the_file)
     ports = defaultdict(list)
+    try:
+        r = etree.ElementTree(file=the_file)
+    except etree.XMLSyntaxError as e:
+        print("Error in %s: %s" % (the_file, e), file=sys.stderr)
+        return ports
     # search for open ports; get the parent of the ports with 'state'='open'
     all_ports = r.xpath('//*/port/state[@state="open"]/..')
     for port in all_ports:
@@ -63,12 +68,13 @@ def main():
     parser.add_argument(
         '-f',
         '--filter-expression',
-        help="A valid XPATH to filter results (e.g. '*[@ostype=\"Windows\"]')"
+        help="A valid XPATH to filter results such as:\n\t'*[@ostype=\"Windows\"]' \n\t'service[@name=\"https\"]'"
     )
     args = parser.parse_args()
 
     discovered = defaultdict()
     for f in args.the_file:
+        print("Parsing %s" % args.the_file)
         ports = do_parse(
             f,
             tcp=args.tcp,
