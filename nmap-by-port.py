@@ -74,7 +74,7 @@ def main():
 
     discovered = defaultdict()
     for f in args.the_file:
-        print("Parsing %s" % args.the_file)
+        # print("Parsing %s" % args.the_file)
         ports = do_parse(
             f,
             tcp=args.tcp,
