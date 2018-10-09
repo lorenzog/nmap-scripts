@@ -12,6 +12,25 @@ import sys
 from lxml import etree
 
 
+# hack: find http oprts
+def find_http_services(the_file, filter_expression):
+    ports = defaultdict(list)
+    try:
+        r = etree.ElementTree(file=the_file)
+    except etree.XMLSyntaxError as e:
+        print("Error in %s: %s" % (the_file, e), file=sys.stderr)
+        return ports
+    _filter = '//*/port/state[@state="open"]/../{}/..'.format(
+        filter_expression)
+    all_ports = r.xpath(_filter)
+    for port in all_ports:
+        port_number = port.get('portid')
+        address = port.xpath('../../address[@addrtype="ipv4"]')[0].get('addr')
+        # key: port/proto e.g. 53/udp
+        ports['{}'.format(port_number)].append(address)
+    return ports
+
+
 def do_parse(the_file, tcp=None, udp=None, requested_ports=None,
              filter_expression=None):
     ports = defaultdict(list)
@@ -59,6 +78,12 @@ def main():
     parser.add_argument('-t', '--tcp', action='store_true')
     parser.add_argument('-p', '--port', action='append', default=[])
     parser.add_argument(
+        '-w', '--web-ports', action='store_true',
+        help=(
+            "Shortcut to extract all ports of service type 'http' and 'https'"
+            " and print them in an eyewitness-compatible list")
+    )
+    parser.add_argument(
         '-o',
         '--output',
         help=("Output into files PORT_PROTO.txt containing "
@@ -68,9 +93,43 @@ def main():
     parser.add_argument(
         '-f',
         '--filter-expression',
-        help="A valid XPATH to filter results such as:\n\t'*[@ostype=\"Windows\"]' \n\t'service[@name=\"https\"]'"
+        nargs='+',
+        help=(
+            "A valid XPATH to filter results such as:"
+            "\n\t'*[@ostype=\"Windows\"]' "
+            "\n\t'service[@name=\"https\"]'"
+        ),
     )
     args = parser.parse_args()
+
+    if args.web_ports:
+        http_ports = defaultdict()
+        https_ports = defaultdict()
+        # if args.filter_expression is not None:
+        #     print("Overriding default expression")
+        #     filter_expression = args.filter_expression
+        for f in args.the_file:
+            _http_ports = find_http_services(
+                f,
+                # http ports
+                'service[@name="http"]'
+            )
+            http_ports.update(_http_ports)
+            _https_ports = find_http_services(
+                f,
+                # http ports
+                'service[@name="https"]'
+            )
+            https_ports.update(_https_ports)
+
+        for port, ips in http_ports.items():
+            for i in ips:
+                print('http://{}:{}/'.format(i, port))
+        for port, ips in https_ports.items():
+            for i in ips:
+                print('https://{}:{}/'.format(i, port))
+
+        raise SystemExit
 
     discovered = defaultdict()
     for f in args.the_file:
